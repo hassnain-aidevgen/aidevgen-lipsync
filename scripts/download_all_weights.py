@@ -34,7 +34,7 @@ download("https://huggingface.co/yzd-v/DWPose/resolve/main/dw-ll_ucoco_384.pth",
 
 # Face Parse
 download("https://download.pytorch.org/models/resnet18-5c106cde.pth", f"{MODELS_DIR}/face-parse-bisent/resnet18-5c106cde.pth")
-download("https://huggingface.co/epiclabs/MuseTalk-weights/resolve/main/79999_iter.pth", f"{MODELS_DIR}/face-parse-bisent/79999_iter.pth")
+download("https://huggingface.co/camenduru/MuseTalk/resolve/main/face-parse-bisent/79999_iter.pth", f"{MODELS_DIR}/face-parse-bisent/79999_iter.pth")
 
 # SD-VAE
 download("https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/config.json", f"{MODELS_DIR}/sd-vae/config.json")
