@@ -25,15 +25,15 @@ RUN curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
 WORKDIR /app
 
 # Copy code, scripts, and weight downloader
-COPY musetalk/ musetalk/
+COPY MuseTalk/ MuseTalk/
 COPY scripts/ scripts/
 
 # Install Python dependencies
 RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --extra-index-url https://download.pytorch.org/whl/cu117
-RUN pip install -r musetalk/requirements.txt
+RUN pip install -r MuseTalk/requirements.txt
 RUN pip install boto3 runpod ffmpeg-python imageio moviepy opencv-python-headless omegaconf tqdm requests
 
-# Download models into musetalk/models
+# Download models into MuseTalk/models
 RUN python3 scripts/download_all_weights.py
 
 # Launch RunPod handler
