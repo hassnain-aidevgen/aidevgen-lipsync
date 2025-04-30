@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+.idea/
+.vscode/
+*.pyc
+.ipynb_checkpoints
+results/
+**/__pycache__/
+*.py[cod]
+*$py.class
+dataset/
+ffmpeg*
+ffmprobe*
+ffplay*
+debug
+exp_out
+.gradio
