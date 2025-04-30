@@ -32,7 +32,7 @@ COPY scripts/ scripts/
 RUN pip install requests
 
 # Download models into MuseTalk/models at build time
-RUN python3 scripts/download_all_weights.py
+# RUN python3 scripts/download_all_weights.py
 
 # Install main dependencies
 RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --extra-index-url https://download.pytorch.org/whl/cu117 && \

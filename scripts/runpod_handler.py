@@ -11,9 +11,13 @@ sys.path.insert(0, BASE_DIR)
 
 from s3_utils import upload_to_s3, cleanup
 from musetalk_wrapper import generate_video
+from download_all_weights import download_all_models
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Download models on cold start
+download_all_models()
 
 def download_from_url(url, suffix):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp")
@@ -36,7 +40,8 @@ def handler(event):
     try:
         logger.info(f"Downloading from {audio_url} and {video_url}")
         audio_path = download_from_url(audio_url, ".wav")
-        video_path = download_from_url(video_url, os.path.splitext(video_url)[-1])
+        video_suffix = os.path.splitext(video_url)[-1] or ".mp4"
+        video_path = download_from_url(video_url, video_suffix)
 
         output_name = f"output_{uuid.uuid4().hex}.mp4"
         output_path = os.path.join("/tmp", output_name)
@@ -53,8 +58,9 @@ def handler(event):
         return {"status": "error", "message": str(e)}
 
     finally:
-        for path in [audio_path, video_path, output_path]:
-            cleanup(path)
+        for path in [locals().get("audio_path"), locals().get("video_path"), locals().get("output_path")]:
+            if path:
+                cleanup(path)
 
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
