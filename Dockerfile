@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1
 
-# Install OS packages and cleanup in the same layer
+# Install OS packages with integrated cleanup
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         software-properties-common \
@@ -15,8 +15,10 @@ RUN apt-get update && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     apt-get install -y --no-install-recommends python3.11 python3.11-distutils && \
+    # Aggressive cleanup after installation
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     # Install pip and set python3 to 3.11
     curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
@@ -25,60 +27,59 @@ RUN apt-get update && \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file first (for better layer caching)
-COPY MuseTalk/requirements.txt /app/MuseTalk/requirements.txt
-COPY scripts/download_all_weights.py /app/scripts/download_all_weights.py
+# First install lightweight core dependencies only
+RUN pip install --no-cache-dir \
+    requests tqdm boto3 runpod concurrent-log-handler && \
+    rm -rf /root/.cache/pip /tmp/*
 
-# Install dependencies directly in one layer
+# Copy script files needed for downloading models
+COPY scripts/__init__.py /app/scripts/__init__.py
+COPY scripts/download_all_weights.py /app/scripts/download_all_weights.py
+COPY scripts/s3_utils.py /app/scripts/s3_utils.py
+
+# Create model directories
+RUN mkdir -p /app/MuseTalk/models
+
+# Run model download with space management (one model at a time)
+RUN cd /app && \
+    # Download only required models first
+    PYTHONUNBUFFERED=1 python3 /app/scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
+    # Clean up all temporary files
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/* && \
+    find /app -name "*.pyc" -type f -delete && \
+    find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Copy requirements file and install remaining dependencies
+COPY MuseTalk/requirements.txt /app/MuseTalk/requirements.txt
+
+# Install PyTorch and other dependencies
 RUN pip install --no-cache-dir \
     torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    requests tqdm boto3 runpod concurrent-log-handler filelock certifi \
-    charset_normalizer idna urllib3 typing_extensions \
     pillow jinja2 markupsafe numpy networkx sympy fsspec mpmath \
     --extra-index-url https://download.pytorch.org/whl/cu117 && \
-    pip install --no-cache-dir -r /app/MuseTalk/requirements.txt
-
-# Copy all application files
-COPY MuseTalk/ /app/MuseTalk/
-COPY scripts/ /app/scripts/
-COPY entrypoint.sh /app/entrypoint.sh
-
-# Make entrypoint script executable
-RUN chmod +x /app/entrypoint.sh
-
-# Download model weights
-RUN python3 /app/scripts/download_all_weights.py && \
-    # Execute aggressive pruning to free up space
-    # Clean pip cache
-    rm -rf /root/.cache/pip && \
-    # Remove apt cache and lists
+    pip install --no-cache-dir -r /app/MuseTalk/requirements.txt && \
+    # Cleanup pip cache immediately
+    rm -rf /root/.cache/pip /tmp/* && \
+    # Clean up remaining space
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    # Clean unused packages
     apt-get autoremove -y && \
-    # Remove all Python bytecode files
+    rm -rf /var/lib/apt/lists/*
+
+# Copy all necessary application files
+COPY MuseTalk/ /app/MuseTalk/
+COPY scripts/musetalk_wrapper.py /app/scripts/musetalk_wrapper.py
+COPY scripts/runpod_handler.py /app/scripts/runpod_handler.py
+
+# Set mime types for image file detection (used in musetalk_wrapper.py)
+RUN python3 -c "import mimetypes; mimetypes.init()"
+
+# Remove unnecessary files to save more space
+RUN apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    # Clean up Python bytecode
     find /app -name "*.pyc" -type f -delete && \
-    find /app -name "__pycache__" -type d -exec rm -rf {} +  2>/dev/null || true && \
-    # Remove temporary files
-    rm -rf /tmp/* /var/tmp/* && \
-    # Remove model cache files that aren't needed after download
-    find /root/.cache -type f -delete && \
-    # Remove any git directories
-    find /app -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove wheels directory if it exists but is empty
-    rm -rf /app/wheels
+    find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser -m appuser && \
-    # Make sure user has access to application files
-    chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
-# Add a health check (adjust URL path as needed for your application)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
-
-# Default entrypoint
+# Default command
 CMD ["python3", "/app/scripts/runpod_handler.py"]
