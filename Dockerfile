@@ -6,13 +6,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1
 
-# Install OS packages, including software-properties-common and tree
+# Install OS packages and clean up in a single layer
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         software-properties-common \
         curl wget git unzip ffmpeg \
-        libgl1 libsm6 libxext6 \
-        tree && \  # Add tree package installation here
+        libgl1 libsm6 libxext6 && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     apt-get install -y --no-install-recommends python3.11 python3.11-distutils && \
@@ -72,8 +71,7 @@ RUN python3 -c "import mimetypes; mimetypes.init()" && \
     find /app -name "*.pyc" -type f -delete && \
     find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
     
-# Directory tree check (to confirm file structure inside the container)
-RUN tree -f /app
+RUN ls -l /app
 
 # Default command
 CMD ["python3", "/app/scripts/runpod_handler.py"]
