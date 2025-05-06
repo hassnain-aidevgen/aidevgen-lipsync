@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1
 
-# Install OS packages and clean up in a single layer
+# Install OS packages, including software-properties-common and tree
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         software-properties-common \
