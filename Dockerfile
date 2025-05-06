@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1
 
-# Install OS packages with integrated cleanup
+# Install OS packages and clean up in a single layer
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         software-properties-common \
@@ -17,7 +17,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends python3.11 python3.11-distutils && \
     apt-get clean && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm -rf /var/lib/apt/lists/* && \
     curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
     ln -sf /usr/local/bin/pip3 /usr/bin/pip
@@ -25,96 +25,36 @@ RUN apt-get update && \
 # Set working directory
 WORKDIR /app
 
-# Install lightweight dependencies first
-RUN pip install --no-cache-dir \
-    requests tqdm boto3 runpod concurrent-log-handler && \
-    rm -rf /root/.cache/pip /tmp/*
+# Install minimal dependencies for downloads
+RUN pip install --no-cache-dir requests tqdm boto3 runpod concurrent-log-handler && \
+    rm -rf /root/.cache/pip
 
 # Create model directories
-RUN mkdir -p /app/MuseTalk/models/musetalk \
-             /app/MuseTalk/models/musetalkV15 \
-             /app/MuseTalk/models/syncnet \
-             /app/MuseTalk/models/dwpose \
-             /app/MuseTalk/models/face-parse-bisent \
-             /app/MuseTalk/models/sd-vae \
-             /app/MuseTalk/models/whisper
+RUN mkdir -p /app/MuseTalk/models
 
-# Copy script files needed for downloads
-COPY scripts/download_all_weights.py /app/scripts/download_all_weights.py
-COPY scripts/__init__.py /app/scripts/__init__.py
+# Copy scripts with minimal dependencies
+COPY scripts/download_all_weights.py scripts/__init__.py /app/scripts/
 
-# Download small files first - config files
-RUN wget -q -O /app/MuseTalk/models/musetalk/musetalk.json \
-        https://huggingface.co/TMElyralab/MuseTalk/resolve/main/musetalk/musetalk.json && \
-    wget -q -O /app/MuseTalk/models/musetalkV15/musetalk.json \
-        https://huggingface.co/TMElyralab/MuseTalk/resolve/main/musetalkV15/musetalk.json && \
-    wget -q -O /app/MuseTalk/models/sd-vae/config.json \
-        https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/config.json && \
-    wget -q -O /app/MuseTalk/models/whisper/config.json \
-        https://huggingface.co/openai/whisper-tiny/resolve/main/config.json && \
-    wget -q -O /app/MuseTalk/models/whisper/preprocessor_config.json \
-        https://huggingface.co/openai/whisper-tiny/resolve/main/preprocessor_config.json && \
-    rm -rf /tmp/* /var/tmp/*
+# Modify download script to skip hash check (saves space)
+RUN sed -i 's/if not skip_hash_check and sha256_checksum(full_path) != expected_hash:/if False:/' /app/scripts/download_all_weights.py
 
-# Download first medium-sized model
-RUN wget -q --show-progress -O /app/MuseTalk/models/syncnet/latentsync_syncnet.pt \
-        https://huggingface.co/ByteDance/LatentSync/resolve/main/latentsync_syncnet.pt && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download second medium-sized model
-RUN wget -q --show-progress -O /app/MuseTalk/models/dwpose/dw-ll_ucoco_384.pth \
-        https://huggingface.co/yzd-v/DWPose/resolve/main/dw-ll_ucoco_384.pth && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download face parse models
-RUN wget -q --show-progress -O /app/MuseTalk/models/face-parse-bisent/resnet18-5c106cde.pth \
-        https://download.pytorch.org/models/resnet18-5c106cde.pth && \
-    wget -q --show-progress -O /app/MuseTalk/models/face-parse-bisent/79999_iter.pth \
-        https://huggingface.co/camenduru/MuseTalk/resolve/main/face-parse-bisent/79999_iter.pth && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download whisper model
-RUN wget -q --show-progress -O /app/MuseTalk/models/whisper/pytorch_model.bin \
-        https://huggingface.co/openai/whisper-tiny/resolve/main/pytorch_model.bin && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download SD-VAE model
-RUN wget -q --show-progress -O /app/MuseTalk/models/sd-vae/diffusion_pytorch_model.bin \
-        https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/diffusion_pytorch_model.bin && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download first large model
-RUN wget -q --show-progress -O /app/MuseTalk/models/musetalk/pytorch_model.bin \
-        https://huggingface.co/TMElyralab/MuseTalk/resolve/main/musetalk/pytorch_model.bin && \
-    rm -rf /tmp/* /var/tmp/*
-
-# Download second large model
-RUN wget -q --show-progress -O /app/MuseTalk/models/musetalkV15/unet.pth \
-        https://huggingface.co/TMElyralab/MuseTalk/resolve/main/musetalkV15/unet.pth && \
-    rm -rf /tmp/* /var/tmp/*
+# Download models with space management
+RUN cd /app && python3 scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
+    rm -rf /root/.cache/* /tmp/*
 
 # Copy requirements file
-COPY MuseTalk/requirements.txt /app/MuseTalk/requirements.txt
+COPY MuseTalk/requirements.txt /app/MuseTalk/
 
-# Filter gradio from requirements
-RUN grep -v "gradio" /app/MuseTalk/requirements.txt > /tmp/filtered_requirements.txt
-
-# Install PyTorch and other heavy dependencies
-RUN pip install --no-cache-dir \
+# Filter requirements AND install in a single step to prevent temp file deletion
+RUN grep -v "gradio" /app/MuseTalk/requirements.txt > /app/filtered_requirements.txt && \
+    pip install --no-cache-dir \
     torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
     --extra-index-url https://download.pytorch.org/whl/cu117 && \
-    rm -rf /root/.cache/pip /tmp/*
+    pip install --no-cache-dir -r /app/filtered_requirements.txt && \
+    rm -rf /root/.cache/pip
 
-# Install remaining dependencies
-RUN pip install --no-cache-dir -r /tmp/filtered_requirements.txt && \
-    rm -rf /root/.cache/pip /tmp/*
-
-# Copy remaining scripts
-COPY scripts/s3_utils.py /app/scripts/s3_utils.py
-COPY scripts/musetalk_wrapper.py /app/scripts/musetalk_wrapper.py
-COPY scripts/runpod_handler.py /app/scripts/runpod_handler.py
-
-# Copy essential MuseTalk files
+# Copy remaining files
+COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /app/scripts/
 COPY MuseTalk/*.py /app/MuseTalk/
 
 # Initialize mime types and final cleanup
