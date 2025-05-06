@@ -9,37 +9,49 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      # 1. Check out repository
+      # 1. Shallow‐checkout just the latest commit
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      # 2. Prune *before* anything else
+      # 2. Remove Git history to reclaim space
+      - name: Remove Git metadata
+        run: rm -rf .git
+
+      # 3. Maximize available disk space on the runner
+      - name: Maximize build disk space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 1024 # leave 1 GB on /
+          temp-reserve-mb: 1024 # leave 1 GB on /mnt
+
+      # 4. Prune any leftover Docker data
       - name: Prune unused Docker data
         run: |
           docker builder prune --all --force
           docker image prune --all --force
           docker system prune --all --volumes --force
 
-      # 3. Set up Docker Buildx
+      # 5. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 4. Log in to Docker Hub
+      # 6. Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 5. Build & push without caching or loading locally
+      # 7. Build & push without caching or loading locally
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # never keep build cache or image on the runner
-          no-cache: true
-          load: false
+          no-cache: true # skip writing build cache
+          load: false # don’t reload image into local daemon
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:${{ github.sha }}
