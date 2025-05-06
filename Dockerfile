@@ -35,6 +35,9 @@ RUN mkdir -p /app/MuseTalk/models
 # Copy scripts with minimal dependencies
 COPY scripts/download_all_weights.py scripts/__init__.py /app/scripts/
 
+# Add directory listing to verify the copy operation (for debugging)
+RUN ls -l /app/scripts/
+
 # Modify download script to skip hash check (saves space)
 RUN sed -i 's/if not skip_hash_check and sha256_checksum(full_path) != expected_hash:/if False:/' /app/scripts/download_all_weights.py
 
@@ -57,6 +60,9 @@ RUN grep -v "gradio" /app/MuseTalk/requirements.txt > /app/filtered_requirements
 COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /app/scripts/
 COPY MuseTalk/*.py /app/MuseTalk/
 
+# Add directory listing to verify the copy operation (for debugging)
+RUN ls -l /app/MuseTalk/
+
 # Initialize mime types and final cleanup
 RUN python3 -c "import mimetypes; mimetypes.init()" && \
     apt-get clean && \
@@ -64,6 +70,8 @@ RUN python3 -c "import mimetypes; mimetypes.init()" && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     find /app -name "*.pyc" -type f -delete && \
     find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-
+    
+RUN tree -f /app
+    
 # Default command
 CMD ["python3", "/app/scripts/runpod_handler.py"]
