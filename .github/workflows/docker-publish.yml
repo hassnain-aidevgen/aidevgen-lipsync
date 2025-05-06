@@ -10,26 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out repository
+      # 1. Clean up runner space before starting the job
+      - name: Free up disk space
+        run: |
+          # Remove unnecessary packages and tool caches
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
+            "$AGENT_TOOLSDIRECTORY" || true
+
+          # Remove Docker images from previous runs
+          docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
+
+          # Prune Docker system and volumes
+          docker system prune --all --volumes --force
+          docker builder prune --all --force
+
+          # Clean apt cache and uninstall unnecessary software
+          sudo apt clean
+          sudo apt -y autoremove
+
+          # Show available space after cleanup
+          echo "Available disk space after cleanup:"
+          df -h /
+
+      # 2. Check out repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Docker Buildx
+      # 3. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3. Log in to Docker Hub
+      # 4. Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # 4. Free up Docker space
-      - name: Free up Docker space
-        run: |
-          docker system prune --all --volumes --force
-          docker builder prune --all --force
 
       # 5. Build & push the Docker image
       - name: Build and push Docker image
@@ -40,3 +57,18 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:${{ github.sha }}
+          # Cache to improve build speeds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 6. Cleanup after build to ensure space for future jobs
+      - name: Post-build cleanup
+        if: always()
+        run: |
+          # Clean up any build artifacts
+          docker system prune --all --volumes --force
+          docker builder prune --all --force
+
+          # Show available space after all operations
+          echo "Final available disk space:"
+          df -h /
