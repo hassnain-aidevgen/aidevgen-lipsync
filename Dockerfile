@@ -61,9 +61,10 @@ COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /
 COPY MuseTalk/*.py /app/MuseTalk/
 
 # Add directory listing to verify the copy operation (for debugging)
-RUN ls -l /app/MuseTalk/
+RUN echo "Listing /app/MuseTalk/:" && ls -l /app/MuseTalk/
 
-# Verify that the MuseTalk module is present and can be imported
+# Ensure MuseTalk module can be imported
+ENV PYTHONPATH=/app/MuseTalk:$PYTHONPATH
 RUN python3 -c "import MuseTalk; print('MuseTalk is successfully imported')"
 
 # Initialize mime types and final cleanup
