@@ -63,6 +63,9 @@ COPY MuseTalk/*.py /app/MuseTalk/
 # Add directory listing to verify the copy operation (for debugging)
 RUN ls -l /app/MuseTalk/
 
+# Verify that the MuseTalk module is present and can be imported
+RUN python3 -c "import MuseTalk; print('MuseTalk is successfully imported')"
+
 # Initialize mime types and final cleanup
 RUN python3 -c "import mimetypes; mimetypes.init()" && \
     apt-get clean && \
@@ -70,8 +73,9 @@ RUN python3 -c "import mimetypes; mimetypes.init()" && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     find /app -name "*.pyc" -type f -delete && \
     find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-    
+
+# Verify the directory structure of the container (for debugging)
 RUN ls -l /app
 
-# Default command
+# Default command to run the handler script
 CMD ["python3", "/app/scripts/runpod_handler.py"]
