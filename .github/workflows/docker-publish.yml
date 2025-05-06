@@ -3,18 +3,17 @@ name: 📦 Build & Push Docker image
 on:
   push:
     branches:
-      - main # or your chosen branch
+      - main
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       # 1. Check out repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Free up Docker space as early as possible
+      # 2. Prune *before* anything else
       - name: Prune unused Docker data
         run: |
           docker builder prune --all --force
@@ -32,12 +31,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 5. Build & push the Docker image
+      # 5. Build & push without caching or loading locally
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          # never keep build cache or image on the runner
+          no-cache: true
+          load: false
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/aidevgen-lipsync:${{ github.sha }}
