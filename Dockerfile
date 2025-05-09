@@ -15,12 +15,11 @@ RUN apt-get update && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     apt-get install -y --no-install-recommends python3.11 python3.11-distutils && \
-    apt-get clean && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* && \
     curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
-    ln -sf /usr/local/bin/pip3 /usr/bin/pip
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -29,54 +28,55 @@ WORKDIR /app
 RUN pip install --no-cache-dir requests tqdm boto3 runpod concurrent-log-handler && \
     rm -rf /root/.cache/pip
 
-# Create model directories
+# Create MuseTalk app dir and models subdir
 RUN mkdir -p /app/MuseTalk/models
 
-# Copy scripts with minimal dependencies
+# Copy your download script
 COPY scripts/download_all_weights.py scripts/__init__.py /app/scripts/
 
-# Add directory listing to verify the copy operation (for debugging)
-RUN ls -l /app/scripts/
+# Skip hash check in download script
+RUN sed -i 's/if not skip_hash_check and sha256_checksum(full_path) != expected_hash:/if False:/' \
+      /app/scripts/download_all_weights.py
 
-# Modify download script to skip hash check (saves space)
-RUN sed -i 's/if not skip_hash_check and sha256_checksum(full_path) != expected_hash:/if False:/' /app/scripts/download_all_weights.py
-
-# Download models with space management
-RUN cd /app && python3 scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
+# Download all model weights (once at build; you can move this to cold-start if desired)
+RUN python3 /app/scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
     rm -rf /root/.cache/* /tmp/*
 
-# Copy requirements file
+# Copy your MuseTalk application code & requirements
 COPY MuseTalk/requirements.txt /app/MuseTalk/
+COPY MuseTalk/ /app/MuseTalk/
 
-# Filter requirements AND install in a single step to prevent temp file deletion
-RUN grep -v "gradio" /app/MuseTalk/requirements.txt > /app/filtered_requirements.txt && \
-    pip install --no-cache-dir \
-    torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    --extra-index-url https://download.pytorch.org/whl/cu117 && \
-    pip install --no-cache-dir -r /app/filtered_requirements.txt && \
+# Clone the upstream MuseTalk repo (depth=1) **into** /app/MuseTalk/upstream
+RUN git clone --depth 1 https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk/upstream && \
+    # Copy just the musetalk/ package into your app
+    cp -R /app/MuseTalk/upstream/musetalk /app/MuseTalk/ && \
+    # Clean up
+    rm -rf /app/MuseTalk/upstream
+
+# Install PyTorch + GPU stack with retries & timeout, then the rest of your Python reqs
+RUN pip install --no-cache-dir --timeout 120 --retries 5 \
+      torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+      --extra-index-url https://download.pytorch.org/whl/cu117 && \
+    pip install --no-cache-dir --timeout 120 --retries 5 \
+      -r /app/MuseTalk/requirements.txt && \
     rm -rf /root/.cache/pip
 
-# Copy remaining files
+# Copy your service scripts
 COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /app/scripts/
-COPY MuseTalk/*.py /app/MuseTalk/
 
-# Add directory listing to verify the copy operation (for debugging)
-RUN echo "Listing /app/MuseTalk/:" && ls -l /app/MuseTalk/
-
-# Ensure MuseTalk module can be imported
+# Ensure MuseTalk module and the newly cloned musetalk package can be imported
 ENV PYTHONPATH=/app/MuseTalk:$PYTHONPATH
-RUN python3 -c "import MuseTalk; print('MuseTalk is successfully imported')"
+RUN python3 - <<EOF
+import MuseTalk.app
+from musetalk.utils.blending import get_image
+print("✅ MuseTalk & musetalk imported successfully")
+EOF
 
-# Initialize mime types and final cleanup
-RUN python3 -c "import mimetypes; mimetypes.init()" && \
-    apt-get clean && \
-    apt-get autoremove -y && \
+# Final cleanup to slim the image
+RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    find /app -name "*.pyc" -type f -delete && \
+    find /app -name "*.pyc" -delete && \
     find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Verify the directory structure of the container (for debugging)
-RUN ls -l /app
-
-# Default command to run the handler script
+# Default command to run your handler
 CMD ["python3", "/app/scripts/runpod_handler.py"]
