@@ -77,11 +77,9 @@ RUN pip install --no-cache-dir --timeout 120 --retries 5 \
       -r /app/MuseTalk/requirements.txt && \
     rm -rf /root/.cache/pip
 
+# Install OpenMIM and use it to pull in mmengine, mmcv, mmdet & mmpose
 RUN pip install --no-cache-dir -U openmim && \
-    mim install mmengine \
-                "mmcv>=2.0.1" \
-                "mmdet>=3.1.0" \
-                "mmpose>=1.1.0" && \
+    python3 -m mim install mmengine "mmcv>=2.0.1" "mmdet>=3.1.0" "mmpose>=1.1.0"
 
 # Copy your service scripts
 COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /app/scripts/
