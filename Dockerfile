@@ -7,19 +7,35 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 # Install OS packages and clean up in a single layer
-RUN apt-get update && \
+# 1) First apt-get update (retry up to 3×) and install core utilities
+RUN set -eux; \
+    for i in 1 2 3; do \
+      apt-get update --allow-releaseinfo-change && break; \
+      echo "apt-get update failed, retrying ($i)..."; sleep 5; \
+    done; \
     apt-get install -y --no-install-recommends \
-        software-properties-common \
-        curl wget git unzip ffmpeg \
-        libgl1 libsm6 libxext6 && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends python3.11 python3.11-distutils && \
-    curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
+      software-properties-common \
+      curl wget git unzip ffmpeg \
+      libgl1 libsm6 libxext6
+
+# 2) Add deadsnakes PPA, then update again (retry up to 3×)
+RUN add-apt-repository -y ppa:deadsnakes/ppa && \
+    set -eux; \
+    for i in 1 2 3; do \
+      apt-get update --allow-releaseinfo-change && break; \
+      echo "apt-get update after PPA failed, retrying ($i)..."; sleep 5; \
+    done
+
+# 3) Install Python 3.11 & distutils
+RUN apt-get install -y --no-install-recommends python3.11 python3.11-distutils
+
+# 4) Bootstrap pip under Python 3.11 and symlink
+RUN curl -sSL https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
-    ln -sf /usr/local/bin/pip3 /usr/bin/pip && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip
+
+# 5) Clean up apt caches
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -39,8 +55,8 @@ RUN sed -i 's/if not skip_hash_check and sha256_checksum(full_path) != expected_
       /app/scripts/download_all_weights.py
 
 # Download all model weights (once at build; you can move this to cold-start if desired)
-RUN python3 /app/scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
-    rm -rf /root/.cache/* /tmp/*
+# RUN python3 /app/scripts/download_all_weights.py --skip-hash-check --download-one-by-one && \
+#     rm -rf /root/.cache/* /tmp/*
 
 # Copy your MuseTalk application code & requirements
 COPY MuseTalk/requirements.txt /app/MuseTalk/
@@ -61,15 +77,23 @@ RUN pip install --no-cache-dir --timeout 120 --retries 5 \
       -r /app/MuseTalk/requirements.txt && \
     rm -rf /root/.cache/pip
 
+RUN pip install --no-cache-dir -U openmim && \
+    mim install mmengine \
+                "mmcv>=2.0.1" \
+                "mmdet>=3.1.0" \
+                "mmpose>=1.1.0" && \
+
 # Copy your service scripts
 COPY scripts/s3_utils.py scripts/musetalk_wrapper.py scripts/runpod_handler.py /app/scripts/
+
+RUN python3 /app/scripts/download_all_weights.py --skip-hash --single && \
+    rm -rf /root/.cache/* /tmp/*
 
 # Ensure MuseTalk module and the newly cloned musetalk package can be imported
 ENV PYTHONPATH=/app/MuseTalk:$PYTHONPATH
 RUN python3 - <<EOF
-import MuseTalk.app
 from musetalk.utils.blending import get_image
-print("✅ MuseTalk & musetalk imported successfully")
+print("✅ musetalk code imported successfully")
 EOF
 
 # Final cleanup to slim the image
