@@ -56,9 +56,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN python3 /app/MuseTalk/scripts/download_all_weights.py
 
 # Step 11: Install PyTorch GPU version
-RUN pip3 install --no-cache-dir \
-    torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    --index-url https://download.pytorch.org/whl/cu117
+RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2
 
 # Step 12: Install OpenMIM + MMLab ecosystem
 RUN pip3 install --no-cache-dir -U openmim
