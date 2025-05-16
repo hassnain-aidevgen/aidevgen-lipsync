@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from MuseTalk.app import inference
+from app import inference
 from s3_utils import upload_to_s3
 
 def convert_image_to_video(image_path: str, video_path: str, duration: float = 3.0):
