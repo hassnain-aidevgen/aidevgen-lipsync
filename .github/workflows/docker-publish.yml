@@ -3,7 +3,7 @@ name: 📦 Build & Push Docker image
 on:
   push:
     branches:
-      - main # or your chosen branch
+      - v2 # or your chosen branch
 
 jobs:
   build-and-push:
