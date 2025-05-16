@@ -90,4 +90,4 @@ RUN apt-get clean && \
     find /app -name "__pycache__" -type d -exec rm -rf {} + || true
 
 # Step 16: Entrypoint
-CMD ["python3", "/app/MuseTalk/app.py"]
+CMD ["python3", "/app/MuseTalk/scripts/runpod_handler.py"]
