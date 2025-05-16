@@ -72,7 +72,7 @@ RUN pip3 install --no-cache-dir -U openmim
 RUN mim install mmengine
 RUN mim install "mmdet>=3.1.0"
 RUN mim install "mmpose>=1.1.0"
-RUN pip3 install mmcv==2.0.1 -f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html
+RUN pip3 install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html
 
 # Step 13: Patch preprocessing.py for DWPOSE
 RUN sed -i '10a import os\n_THIS_UTILS_DIR = os.path.dirname(__file__)\n_DWPOSE_DIR = os.path.join(_THIS_UTILS_DIR, "dwpose")\nDWPOSE_CONFIG = os.path.join(_DWPOSE_DIR, "rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")\nDWPOSE_CHECKPT = os.path.join(_DWPOSE_DIR, "dw-ll_ucoco_384.pth")' \
