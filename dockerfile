@@ -22,17 +22,19 @@ RUN for i in 1 2 3; do apt-get update && break || sleep 5; done && \
 RUN add-apt-repository -y ppa:deadsnakes/ppa && \
     for i in 1 2 3; do apt-get update && break || sleep 5; done
 
+
 RUN apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-dev \
-    python3.11-distutils && \
+    python3.10 \
+    python3.10-dev \
+    python3.10-distutils && \
     rm -rf /var/lib/apt/lists/*
 
 # Step 3: Install pip for Python 3.11
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 # Step 4: Set Python 3.11 as default
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3 1
 
 # Step 5: Set workdir
@@ -70,7 +72,7 @@ RUN pip3 install --no-cache-dir -U openmim
 RUN mim install mmengine
 RUN mim install "mmdet>=3.1.0"
 RUN mim install "mmpose>=1.1.0"
-RUN pip3 install mmcv==2.0.1 -f https://download.openmmlab.com/mmcv/dist/cu117/torch2.1/index.html
+RUN pip3 install mmcv==2.0.1 -f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html
 
 # Step 13: Patch preprocessing.py for DWPOSE
 RUN sed -i '10a import os\n_THIS_UTILS_DIR = os.path.dirname(__file__)\n_DWPOSE_DIR = os.path.join(_THIS_UTILS_DIR, "dwpose")\nDWPOSE_CONFIG = os.path.join(_DWPOSE_DIR, "rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")\nDWPOSE_CHECKPT = os.path.join(_DWPOSE_DIR, "dw-ll_ucoco_384.pth")' \
