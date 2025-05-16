@@ -18,7 +18,7 @@ RUN for i in 1 2 3; do apt-get update && break || sleep 5; done && \
     wget && \
     rm -rf /var/lib/apt/lists/*
 
-# Step 2: Add deadsnakes PPA and install Python 3.11
+# Step 2: Add deadsnakes PPA and install Python 3.10
 RUN add-apt-repository -y ppa:deadsnakes/ppa && \
     for i in 1 2 3; do apt-get update && break || sleep 5; done
 
@@ -29,10 +29,10 @@ RUN apt-get install -y --no-install-recommends \
     python3.10-distutils && \
     rm -rf /var/lib/apt/lists/*
 
-# Step 3: Install pip for Python 3.11
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+# Step 3: Install pip for Python 3.10
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 
-# Step 4: Set Python 3.11 as default
+# Step 4: Set Python 3.10 as default
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3 1
@@ -63,7 +63,7 @@ RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    python3.11-dev \
+    python3.10-dev \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
