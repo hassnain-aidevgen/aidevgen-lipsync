@@ -19,3 +19,9 @@ ffmpeg-python
 gradio
 spaces
 moviepy
+
+runpod
+requests
+boto3
+concurrent-log-handler
+tqdm
