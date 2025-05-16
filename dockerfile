@@ -58,12 +58,19 @@ RUN python3 /app/MuseTalk/scripts/download_all_weights.py
 # Step 11: Install PyTorch GPU version
 RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2
 
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    python3.11-dev \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Step 12: Install OpenMIM + MMLab ecosystem
 RUN pip3 install --no-cache-dir -U openmim
 RUN mim install mmengine
-RUN mim install "mmcv==2.0.1"
 RUN mim install "mmdet>=3.1.0"
 RUN mim install "mmpose>=1.1.0"
+RUN pip3 install mmcv==2.0.1 -f https://download.openmmlab.com/mmcv/dist/cu117/torch2.1/index.html
 
 # Step 13: Patch preprocessing.py for DWPOSE
 RUN sed -i '10a import os\n_THIS_UTILS_DIR = os.path.dirname(__file__)\n_DWPOSE_DIR = os.path.join(_THIS_UTILS_DIR, "dwpose")\nDWPOSE_CONFIG = os.path.join(_DWPOSE_DIR, "rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")\nDWPOSE_CHECKPT = os.path.join(_DWPOSE_DIR, "dw-ll_ucoco_384.pth")' \
