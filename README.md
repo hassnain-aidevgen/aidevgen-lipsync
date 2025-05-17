@@ -1,5 +1,27 @@
 # MuseTalk Implementation Guide
 
+## Quick Start
+
+```bash
+# 1. Build the Docker image
+docker build -t musetalk -f dockerfile .
+
+# 2. Run the container to download models and start the service
+docker run -p 7860:7860 musetalk
+
+# --- OR ---
+
+# For local development (non-Docker):
+# 1. Install requirements
+pip install -r requirements.txt
+
+# 2. Download all model weights
+python scripts/download_all_weights.py
+
+# 3. Run the application
+python scripts/runpod_handler.py
+```
+
 ## Overview
 
 This document provides a comprehensive guide to the MuseTalk lip-sync application, including the final Dockerfile implementation, key model files, resolved issues, and deployment instructions.
@@ -190,6 +212,61 @@ RUN apt-get clean && \
 
 # Step 21: Entrypoint
 CMD ["python3", "/app/MuseTalk/scripts/runpod_handler.py"]
+```
+
+## Conflict-Free Requirements.txt
+
+Below is a conflict-free requirements file. Create a file named `requirements.txt` with these contents:
+
+```
+# Core dependencies
+numpy>=1.22.0,<1.25.0
+scipy>=1.9.0
+matplotlib>=3.6.0
+scikit-image>=0.19.3
+scikit-learn>=1.1.2
+pandas>=1.5.0
+tqdm>=4.64.1
+
+# ML frameworks
+tensorflow>=2.10.0,<2.12.0
+torchvision>=0.16.0,<0.17.0
+torchaudio>=2.1.0,<2.2.0
+
+# Image and video processing
+opencv-python>=4.6.0.66
+Pillow>=9.2.0
+ffmpeg-python>=0.2.0
+
+# Audio processing
+librosa>=0.9.2
+soundfile>=0.11.0
+
+# Web/API
+gradio>=3.35.2,<3.50.0
+huggingface-hub>=0.16.4,<0.19.0
+fastapi>=0.103.1
+uvicorn>=0.23.2
+
+# Utilities
+requests>=2.28.1
+pyyaml>=6.0
+transformers>=4.30.2,<4.33.0
+diffusers>=0.18.2,<0.20.0
+```
+
+This requirements file has been tested to work with the MuseTalk project and avoids version conflicts. Note that PyTorch is installed separately since it requires special handling for different platforms (CUDA vs. CPU, different OS).
+
+## PyTorch Installation
+
+Install PyTorch separately based on your system:
+
+```bash
+# For CUDA support (Linux/Windows)
+pip install torch==2.1.2
+
+# For macOS (CPU only)
+pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2
 ```
 
 ## Deployment Instructions
